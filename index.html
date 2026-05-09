@@ -16,10 +16,6 @@
   <div id="root"></div>
   <script type="text/babel">
     const { useState, useMemo, useEffect } = React;
-
-   const APP_KEY = `PS2pchjYwiJhRrVfkd7QI2ea3BzT7UyY6LPc`;
-const APP_SECRET = `4kR3I3EG+7HDFPuTg06mEYQqIrfMpgdCoBYzO8gos7cY1Nn+pm76Rt/c/C4XjrGPZ7AH7sAKMU7ivCW3/wmVQE3B6cAnSiqMA7cBWC1eE6aUQT7PC4bS04urwGop2cToNENqbT4K1a7fXuHf0+yyw1kmO+UQN/kh0Xy30SEHY1+u89vdLtU=`;
-    
     const fmt = (n) => Number(n).toLocaleString("ko-KR");
     const pct = (n) => (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
     const profitColor = (n) => n > 0 ? "#1D9E75" : n < 0 ? "#E24B4A" : "#888780";
@@ -35,9 +31,9 @@ const APP_SECRET = `4kR3I3EG+7HDFPuTg06mEYQqIrfMpgdCoBYzO8gos7cY1Nn+pm76Rt/c/C4X
     const emptyForm = { name: "", qty: "", buyDate: "", buyPrice: "", sellDate: "", sellPrice: "" };
     const STORAGE_KEY = "stock_tracker_data";
     const defaultStocks = [
-      { id: 1, name: "삼성전자", ticker: "005930", qty: 10, buyDate: "2024-01-15", buyPrice: 72000, sellDate: "2024-06-20", sellPrice: 82000, currentPrice: null },
-      { id: 2, name: "카카오", ticker: "035720", qty: 5, buyDate: "2024-03-01", buyPrice: 48000, sellDate: "", sellPrice: "", currentPrice: null },
-      { id: 3, name: "NAVER", ticker: "035420", qty: 3, buyDate: "2024-02-10", buyPrice: 195000, sellDate: "2024-08-05", sellPrice: 175000, currentPrice: null },
+      { id: 1, name: "삼성전자", qty: 10, buyDate: "2024-01-15", buyPrice: 72000, sellDate: "2024-06-20", sellPrice: 82000 },
+      { id: 2, name: "카카오", qty: 5, buyDate: "2024-03-01", buyPrice: 48000, sellDate: "", sellPrice: "" },
+      { id: 3, name: "NAVER", qty: 3, buyDate: "2024-02-10", buyPrice: 195000, sellDate: "2024-08-05", sellPrice: 175000 },
     ];
 
     function BarChart({ data }) {
@@ -105,69 +101,17 @@ const APP_SECRET = `4kR3I3EG+7HDFPuTg06mEYQqIrfMpgdCoBYzO8gos7cY1Nn+pm76Rt/c/C4X
       const [showForm, setShowForm] = useState(false);
       const [tab, setTab] = useState("all");
       const [showChart, setShowChart] = useState(false);
-      const [token, setToken] = useState(null);
-      const [loadingPrice, setLoadingPrice] = useState(false);
 
       useEffect(() => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(stocks));
       }, [stocks]);
-
-      const getToken = async () => {
-        try {
-          const res = await fetch("https://openapi.koreainvestment.com:9443/oauth2/tokenP", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ grant_type: "client_credentials", appkey: APP_KEY, appsecret: APP_SECRET })
-          });
-          const data = await res.json();
-          setToken(data.access_token);
-          return data.access_token;
-        } catch (e) {
-          alert("토큰 발급 실패: " + e.message);
-          return null;
-        }
-      };
-
-      const fetchPrice = async (ticker, accessToken) => {
-        try {
-          const res = await fetch(`https://openapi.koreainvestment.com:9443/uapi/domestic-stock/v1/quotations/inquire-price?FID_COND_MRKT_DIV_CODE=J&FID_INPUT_ISCD=${ticker}`, {
-            headers: {
-              "content-type": "application/json",
-              "authorization": `Bearer ${accessToken}`,
-              "appkey": APP_KEY,
-              "appsecret": APP_SECRET,
-              "tr_id": "FHKST01010100",
-              "custtype": "P"
-            }
-          });
-          const data = await res.json();
-          return Number(data.output?.stck_prpr) || null;
-        } catch { return null; }
-      };
-
-      const handleFetchAllPrices = async () => {
-        setLoadingPrice(true);
-        const accessToken = token || await getToken();
-        if (!accessToken) { setLoadingPrice(false); return; }
-        const updated = await Promise.all(stocks.map(async s => {
-          if (s.ticker) {
-            const price = await fetchPrice(s.ticker, accessToken);
-            return { ...s, currentPrice: price };
-          }
-          return s;
-        }));
-        setStocks(updated);
-        setLoadingPrice(false);
-      };
 
       const calc = (s) => {
         const invest = s.qty * s.buyPrice;
         const sold = s.sellDate && s.sellPrice ? s.qty * Number(s.sellPrice) : null;
         const pnl = sold !== null ? sold - invest : null;
         const rate = pnl !== null ? (pnl / invest) * 100 : null;
-        const currentPnl = s.currentPrice && !s.sellDate ? s.qty * s.currentPrice - invest : null;
-        const currentRate = currentPnl !== null ? (currentPnl / invest) * 100 : null;
-        return { invest, pnl, rate, currentPnl, currentRate };
+        return { invest, pnl, rate };
       };
 
       const summary = useMemo(() => {
@@ -197,7 +141,7 @@ const APP_SECRET = `4kR3I3EG+7HDFPuTg06mEYQqIrfMpgdCoBYzO8gos7cY1Nn+pm76Rt/c/C4X
 
       const handleSubmit = () => {
         if (!form.name || !form.qty || !form.buyDate || !form.buyPrice) return;
-        const entry = { ...form, qty: Number(form.qty), buyPrice: Number(form.buyPrice), sellPrice: form.sellPrice ? Number(form.sellPrice) : "", currentPrice: null };
+        const entry = { ...form, qty: Number(form.qty), buyPrice: Number(form.buyPrice), sellPrice: form.sellPrice ? Number(form.sellPrice) : "" };
         if (editId !== null) {
           setStocks(stocks.map(s => s.id === editId ? { ...s, ...entry } : s));
           setEditId(null);
@@ -208,7 +152,7 @@ const APP_SECRET = `4kR3I3EG+7HDFPuTg06mEYQqIrfMpgdCoBYzO8gos7cY1Nn+pm76Rt/c/C4X
       };
 
       const handleEdit = (s) => {
-        setForm({ name: s.name, ticker: s.ticker || "", qty: s.qty, buyDate: s.buyDate, buyPrice: s.buyPrice, sellDate: s.sellDate || "", sellPrice: s.sellPrice || "" });
+        setForm({ name: s.name, qty: s.qty, buyDate: s.buyDate, buyPrice: s.buyPrice, sellDate: s.sellDate || "", sellPrice: s.sellPrice || "" });
         setEditId(s.id); setShowForm(true);
       };
 
@@ -219,14 +163,9 @@ const APP_SECRET = `4kR3I3EG+7HDFPuTg06mEYQqIrfMpgdCoBYzO8gos7cY1Nn+pm76Rt/c/C4X
               <div style={{ width: 10, height: 32, borderRadius: 4, background: "linear-gradient(180deg,#378ADD,#1D9E75)" }} />
               <h2 style={{ fontSize: 20, fontWeight: 500, margin: 0 }}>주식 투자 트래커</h2>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={handleFetchAllPrices} disabled={loadingPrice} style={{ padding: "5px 14px", borderRadius: 8, border: "1.5px solid #1D9E75", background: "#E1F5EE", color: "#0F6E56", fontSize: 13, cursor: "pointer" }}>
-                {loadingPrice ? "조회중..." : "📈 현재가 조회"}
-              </button>
-              <button onClick={() => setShowChart(!showChart)} style={{ padding: "5px 14px", borderRadius: 8, border: "1.5px solid #7F77DD", background: showChart ? "#7F77DD" : "#EEEDFE", color: showChart ? "#fff" : "#534AB7", fontSize: 13, cursor: "pointer" }}>
-                {showChart ? "차트 닫기" : "📊 차트"}
-              </button>
-            </div>
+            <button onClick={() => setShowChart(!showChart)} style={{ padding: "5px 14px", borderRadius: 8, border: "1.5px solid #7F77DD", background: showChart ? "#7F77DD" : "#EEEDFE", color: showChart ? "#fff" : "#534AB7", fontSize: 13, cursor: "pointer" }}>
+              {showChart ? "차트 닫기" : "📊 차트"}
+            </button>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: "1.5rem" }}>
@@ -265,7 +204,7 @@ const APP_SECRET = `4kR3I3EG+7HDFPuTg06mEYQqIrfMpgdCoBYzO8gos7cY1Nn+pm76Rt/c/C4X
                 <button key={v} onClick={() => setTab(v)} style={{ padding: "5px 14px", borderRadius: 20, border: tab === v ? "1.5px solid #378ADD" : "1px solid #ddd", background: tab === v ? "#E6F1FB" : "transparent", color: tab === v ? "#185FA5" : "#888", fontSize: 13, cursor: "pointer" }}>{l}</button>
               ))}
             </div>
-            <button onClick={() => { setForm({...emptyForm, ticker: ""}); setEditId(null); setShowForm(!showForm); }} style={{ padding: "6px 14px", borderRadius: 8, border: "1.5px solid #378ADD", background: showForm ? "#378ADD" : "#E6F1FB", color: showForm ? "#fff" : "#185FA5", fontSize: 13, cursor: "pointer" }}>
+            <button onClick={() => { setForm(emptyForm); setEditId(null); setShowForm(!showForm); }} style={{ padding: "6px 14px", borderRadius: 8, border: "1.5px solid #378ADD", background: showForm ? "#378ADD" : "#E6F1FB", color: showForm ? "#fff" : "#185FA5", fontSize: 13, cursor: "pointer" }}>
               {showForm ? "닫기" : "+ 종목 추가"}
             </button>
           </div>
@@ -274,7 +213,7 @@ const APP_SECRET = `4kR3I3EG+7HDFPuTg06mEYQqIrfMpgdCoBYzO8gos7cY1Nn+pm76Rt/c/C4X
             <div style={{ background: "#EEEDFE", border: "1px solid #AFA9EC", borderRadius: 12, padding: "1rem 1.25rem", marginBottom: "1rem" }}>
               <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 12, color: "#3C3489", borderBottom: "1px solid #AFA9EC", paddingBottom: 8 }}>{editId ? "종목 수정" : "새 종목 추가"}</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-                {[["종목명","name","text","예: 삼성전자"],["종목코드","ticker","text","예: 005930"],["매수 수량(주)","qty","number","10"],["매수 단가(₩)","buyPrice","number","70000"],["매수 날짜","buyDate","date",""],["매도 날짜(선택)","sellDate","date",""],["매도 단가(₩,선택)","sellPrice","number","80000"]].map(([label,key,type,ph]) => (
+                {[["종목명","name","text","예: 삼성전자"],["매수 수량(주)","qty","number","10"],["매수 날짜","buyDate","date",""],["매수 단가(₩)","buyPrice","number","70000"],["매도 날짜(선택)","sellDate","date",""],["매도 단가(₩,선택)","sellPrice","number","80000"]].map(([label,key,type,ph]) => (
                   <div key={key}>
                     <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>{label}</div>
                     <input type={type} placeholder={ph} value={form[key] || ""} onChange={e => setForm({...form, [key]: e.target.value})} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #ccc", fontSize: 14, width: "100%" }} />
@@ -287,7 +226,7 @@ const APP_SECRET = `4kR3I3EG+7HDFPuTg06mEYQqIrfMpgdCoBYzO8gos7cY1Nn+pm76Rt/c/C4X
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {filtered.map((s, idx) => {
-              const { invest, pnl, rate, currentPnl, currentRate } = calc(s);
+              const { invest, pnl, rate } = calc(s);
               const hasSell = !!s.sellDate && !!s.sellPrice;
               const clr = CARD_COLORS[idx % CARD_COLORS.length];
               return (
@@ -296,7 +235,7 @@ const APP_SECRET = `4kR3I3EG+7HDFPuTg06mEYQqIrfMpgdCoBYzO8gos7cY1Nn+pm76Rt/c/C4X
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <div style={{ width: 40, height: 40, borderRadius: 10, background: clr.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 500, color: "#fff" }}>{s.name.slice(0,2)}</div>
                       <div>
-                        <div style={{ fontWeight: 500, fontSize: 15, color: clr.text }}>{s.name} {s.ticker && <span style={{ fontSize: 11, color: clr.accent }}>({s.ticker})</span>}</div>
+                        <div style={{ fontWeight: 500, fontSize: 15, color: clr.text }}>{s.name}</div>
                         <div style={{ fontSize: 12, color: clr.accent, marginTop: 2 }}>{s.qty}주 · 매수 {s.buyDate}{hasSell ? " · 매도 " + s.sellDate : ""}</div>
                       </div>
                     </div>
@@ -307,16 +246,18 @@ const APP_SECRET = `4kR3I3EG+7HDFPuTg06mEYQqIrfMpgdCoBYzO8gos7cY1Nn+pm76Rt/c/C4X
                     </div>
                   </div>
                   <div style={{ borderTop: "1px dashed " + clr.border, margin: "12px 0" }} />
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: hasSell ? "repeat(4,1fr)" : "repeat(3,1fr)", gap: 8 }}>
                     {[
                       { label: "매수 단가", value: "₩" + fmt(s.buyPrice) },
                       { label: "총 투자금액", value: "₩" + fmt(invest) },
-                      { label: hasSell ? "매도 단가" : "현재가", value: hasSell ? "₩" + fmt(s.sellPrice) : s.currentPrice ? "₩" + fmt(s.currentPrice) : "-" },
-                      { label: "손익", value: hasSell ? (pnl >= 0 ? "+" : "") + "₩" + fmt(Math.round(Math.abs(pnl))) : currentPnl !== null ? (currentPnl >= 0 ? "+" : "") + "₩" + fmt(Math.round(Math.abs(currentPnl))) : "-", sub: hasSell ? pct(rate) : currentRate !== null ? pct(currentRate) : null, pnl: hasSell ? pnl : currentPnl }
+                      ...(hasSell ? [
+                        { label: "매도 단가", value: "₩" + fmt(s.sellPrice) },
+                        { label: "손익", value: (pnl >= 0 ? "+" : "") + "₩" + fmt(Math.round(Math.abs(pnl))), sub: pct(rate), pnl }
+                      ] : [{ label: "상태", value: "보유중" }])
                     ].map((m, i) => (
                       <div key={i} style={{ background: "rgba(255,255,255,0.6)", borderRadius: 8, padding: "8px 10px", border: "1px solid " + clr.border }}>
                         <div style={{ fontSize: 11, color: clr.accent, marginBottom: 3 }}>{m.label}</div>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: m.pnl !== undefined && m.pnl !== null ? profitColor(m.pnl) : clr.text }}>{m.value}</div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: m.pnl !== undefined ? profitColor(m.pnl) : clr.text }}>{m.value}</div>
                         {m.sub && <div style={{ fontSize: 11, color: profitColor(m.pnl), marginTop: 2 }}>{m.sub}</div>}
                       </div>
                     ))}
