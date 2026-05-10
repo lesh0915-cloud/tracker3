@@ -270,15 +270,15 @@ function winRate(){const sold=stocks.filter(s=>s.sell!=null);if(!sold.length)ret
 // ── 야후 파이낸스 주가 조회 ──
 async function fetchPrice(ticker){
   if(!ticker)return null;
-  // 국내 주식: 6자리 숫자면 .KS 붙이기
   const symbol=(/^\d{6}$/.test(ticker))?ticker+'.KS':ticker.toUpperCase();
-  const url=`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`;
+  const target=`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`;
+  const proxy=`https://api.allorigins.win/get?url=${encodeURIComponent(target)}`;
   try{
-    const res=await fetch(url);
+    const res=await fetch(proxy);
     if(!res.ok)return null;
-    const data=await res.json();
-    const price=data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-    return price||null;
+    const wrapper=await res.json();
+    const data=JSON.parse(wrapper.contents);
+    return data?.chart?.result?.[0]?.meta?.regularMarketPrice||null;
   }catch{return null;}
 }
 
