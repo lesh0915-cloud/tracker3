@@ -9,7 +9,6 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
     const firebaseConfig = {
       apiKey: "AIzaSyDPbYlxVZaLpTkuPdRh2PXTD7vEPyL0SUQ",
       authDomain: "stock-tracker-90ab7.firebaseapp.com",
@@ -19,11 +18,9 @@
       messagingSenderId: "235981970888",
       appId: "1:235981970888:web:ea1c7312738c7a5838f4fd"
     };
-
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     const stocksRef = ref(db, 'stocks');
-
     window._fbSave = (stocks) => set(stocksRef, stocks);
     window._fbListen = (cb) => onValue(stocksRef, snap => {
       const val = snap.val();
@@ -177,7 +174,7 @@
   </div>
   <div class="notice">
     <i class="ti ti-info-circle" style="font-size:13px;flex-shrink:0"></i>
-    Alpha Vantage 전날 종가 자동 입력 · Firebase 기기 간 실시간 동기화 · 투자 판단은 반드시 본인 책임 하에 하시기 바랍니다.
+    전날 종가 자동 입력 · 랩탑/모바일 실시간 동기화 · 투자 판단은 반드시 본인 책임 하에 하시기 바랍니다.
   </div>
   <div class="summary-grid" id="summaryGrid"></div>
   <div id="alertBanner"></div>
@@ -223,9 +220,9 @@
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">종목 코드 (Alpha Vantage)</label>
-        <input class="form-input" id="f_ticker" placeholder="예) 005930.KS (삼성전자), AAPL (애플)">
-        <div class="form-hint"><i class="ti ti-info-circle" style="font-size:11px;vertical-align:-1px"></i> 국내: 종목코드.KS (005930.KS) / 미국: 영문 티커 (AAPL)</div>
+        <label class="form-label">종목 코드</label>
+        <input class="form-input" id="f_ticker" placeholder="네이버 6자리 코드 입력 (예: 005930)">
+        <div class="form-hint"><i class="ti ti-info-circle" style="font-size:11px;vertical-align:-1px"></i> 국내: 네이버 종목코드 6자리 (005930) / 미국: 영문 티커 (AAPL, TSLA)</div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">주수 *</label><input class="form-input" id="f_qty" type="number" placeholder="10"></div>
@@ -264,12 +261,19 @@
 </div>
 
 <script>
-const AV_KEY = 'F5HE72I50PCPHXWR';
+const AV_KEY='F5HE72I50PCPHXWR';
 const COLORS=[{bg:'#E6F1FB',text:'#0C447C'},{bg:'#E1F5EE',text:'#085041'},{bg:'#FAEEDA',text:'#633806'},{bg:'#FCEBEB',text:'#791F1F'},{bg:'#EEEDFE',text:'#3C3489'},{bg:'#FBEAF0',text:'#72243E'},{bg:'#EAF3DE',text:'#27500A'},{bg:'#FAECE7',text:'#712B13'}];
 const SECTOR_COLORS={'반도체':'#185FA5','IT/플랫폼':'#1D9E75','바이오/헬스케어':'#D4537E','제약':'#7F77DD','금융':'#BA7517','에너지':'#D85A30','소비재':'#639922','산업재':'#888780','기타':'#B4B2A9'};
 let stocks=[],editIdx=null,filter='all',selectedSentiment='😐',pieChartInstance=null,fbReady=false;
 
-// ── Firebase 연동 ──
+// 종목코드 자동 변환 (6자리 숫자 → .KS 자동 추가)
+function toAvSymbol(ticker){
+  if(!ticker)return null;
+  const t=ticker.trim();
+  return /^\d{6}$/.test(t)?t+'.KS':t.toUpperCase();
+}
+
+// Firebase 연동
 function waitForFb(cb){
   if(window._fbSave&&window._fbListen){cb();}
   else{setTimeout(()=>waitForFb(cb),100);}
@@ -284,14 +288,13 @@ waitForFb(()=>{
   });
 });
 
-function save(){
-  if(fbReady&&window._fbSave) window._fbSave(stocks);
-}
+function save(){if(fbReady&&window._fbSave)window._fbSave(stocks);}
 
-// ── Alpha Vantage 전날 종가 ──
+// Alpha Vantage 전날 종가
 async function fetchPrice(ticker){
   if(!ticker)return null;
-  const url=`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(ticker)}&apikey=${AV_KEY}`;
+  const symbol=toAvSymbol(ticker);
+  const url=`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${AV_KEY}`;
   try{
     const res=await fetch(url);
     if(!res.ok)return null;
@@ -312,7 +315,7 @@ async function refreshPrice(idx){
     save();render();
   }else{
     if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-refresh" style="font-size:12px"></i>';}
-    alert(`${s.name} 종가를 불러오지 못했습니다.\n티커(${s.ticker})를 확인해주세요.\n예) 삼성전자→005930.KS, 애플→AAPL`);
+    alert(`${s.name} 종가를 불러오지 못했습니다.\n종목코드(${s.ticker})를 확인해주세요.\n예) 삼성전자→005930, 애플→AAPL`);
   }
 }
 
@@ -325,7 +328,7 @@ async function refreshAllPrices(){
     const idx=stocks.indexOf(s);
     const price=await fetchPrice(s.ticker);
     if(price){stocks[idx].current=Math.round(price);stocks[idx].priceUpdated=new Date().toLocaleDateString('ko-KR');}
-    await new Promise(r=>setTimeout(r,1200)); // API 호출 간격 (분당 5회 제한)
+    await new Promise(r=>setTimeout(r,1200));
   }
   save();render();
   btn.disabled=false;btn.innerHTML='<i class="ti ti-refresh" style="font-size:13px;vertical-align:-2px;margin-right:4px"></i>전날 종가 갱신';
@@ -403,11 +406,51 @@ function renderList(){
 function switchMemoTab(btn,key,prefix){btn.closest('.memo-section').querySelectorAll('.memo-tab').forEach(t=>t.classList.remove('active'));btn.classList.add('active');btn.closest('.memo-section').querySelectorAll('.memo-content').forEach(c=>c.classList.remove('visible'));document.getElementById(prefix+'_'+key)?.classList.add('visible');}
 function setFilter(f,btn){filter=f;document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));btn.classList.add('active');renderList();}
 function setSentiment(btn){document.querySelectorAll('#f_sentiment_wrap .sentiment-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');selectedSentiment=btn.dataset.v;}
-function openModal(idx=null){editIdx=idx;document.getElementById('modalTitle').textContent=idx!=null?'종목 수정':'종목 추가';if(idx!=null){const s=stocks[idx];['name','ticker','qty','buy','buydate','current','target','stop','sell','selldate','reason','news','review'].forEach(f=>{const el=document.getElementById('f_'+f);if(el)el.value=s[f]||'';});document.getElementById('f_sector').value=s.sector||'기타';selectedSentiment=s.sentiment||'😐';}else{['name','ticker','qty','buy','buydate','current','target','stop','sell','selldate','reason','news','review'].forEach(f=>{const el=document.getElementById('f_'+f);if(el)el.value='';});selectedSentiment='😐';}document.querySelectorAll('#f_sentiment_wrap .sentiment-btn').forEach(b=>b.classList.toggle('active',b.dataset.v===selectedSentiment));document.getElementById('modalOverlay').classList.add('open');}
+
+function openModal(idx=null){
+  editIdx=idx;
+  document.getElementById('modalTitle').textContent=idx!=null?'종목 수정':'종목 추가';
+  if(idx!=null){const s=stocks[idx];['name','ticker','qty','buy','buydate','current','target','stop','sell','selldate','reason','news','review'].forEach(f=>{const el=document.getElementById('f_'+f);if(el)el.value=s[f]||'';});document.getElementById('f_sector').value=s.sector||'기타';selectedSentiment=s.sentiment||'😐';}
+  else{['name','ticker','qty','buy','buydate','current','target','stop','sell','selldate','reason','news','review'].forEach(f=>{const el=document.getElementById('f_'+f);if(el)el.value='';});selectedSentiment='😐';}
+  document.querySelectorAll('#f_sentiment_wrap .sentiment-btn').forEach(b=>b.classList.toggle('active',b.dataset.v===selectedSentiment));
+  document.getElementById('modalOverlay').classList.add('open');
+}
 function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
-function saveStock(){const name=document.getElementById('f_name').value.trim(),qty=parseFloat(document.getElementById('f_qty').value),buy=parseFloat(document.getElementById('f_buy').value),buydate=document.getElementById('f_buydate').value;if(!name||!qty||!buy||!buydate){alert('종목명, 주수, 매수 단가, 매수일은 필수입니다');return;}const stock={id:editIdx!=null?stocks[editIdx].id:Date.now(),name,sector:document.getElementById('f_sector').value,ticker:document.getElementById('f_ticker').value.trim(),qty,buy,buydate,current:parseFloat(document.getElementById('f_current').value)||null,target:parseFloat(document.getElementById('f_target').value)||null,stop:parseFloat(document.getElementById('f_stop').value)||null,sell:parseFloat(document.getElementById('f_sell').value)||null,selldate:document.getElementById('f_selldate').value||null,reason:document.getElementById('f_reason').value.trim(),news:document.getElementById('f_news').value.trim(),review:document.getElementById('f_review').value.trim(),sentiment:selectedSentiment,priceUpdated:editIdx!=null?stocks[editIdx].priceUpdated:null};if(editIdx!=null)stocks[editIdx]=stock;else stocks.push(stock);save();closeModal();}
-function deleteStock(idx){if(confirm('삭제하시겠습니까?')){stocks.splice(idx,1);save();}}
-function exportCSV(){const headers=['종목명','업종','티커','주수','매수단가','총투자금','매수일','전날종가','목표가','손절가','매도단가','매도일','매수이유','참고뉴스','심리','반성메모','손익','수익률(%)'];const rows=stocks.map(s=>{const{gain,pct}=calcProfit(s);return[s.name,s.sector,s.ticker||'',s.qty,s.buy,s.buy*s.qty,s.buydate,s.current||'',s.target||'',s.stop||'',s.sell||'',s.selldate||'',`"${(s.reason||'').replace(/"/g,'""')}"`,`"${(s.news||'').replace(/"/g,'""')}"`,s.sentiment||'',`"${(s.review||'').replace(/"/g,'""')}"`,gain!=null?Math.round(gain):'',pct!=null?pct.toFixed(2):''].join(',');});const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+[headers.join(','),...rows].join('\n')],{type:'text/csv;charset=utf-8;'}));a.download='주식트래커_'+new Date().toISOString().slice(0,10)+'.csv';a.click();}
+
+function saveStock(){
+  const name=document.getElementById('f_name').value.trim(),qty=parseFloat(document.getElementById('f_qty').value),buy=parseFloat(document.getElementById('f_buy').value),buydate=document.getElementById('f_buydate').value;
+  if(!name||!qty||!buy||!buydate){alert('종목명, 주수, 매수 단가, 매수일은 필수입니다');return;}
+  const stock={
+    id:editIdx!=null?stocks[editIdx].id:Date.now(),
+    name,sector:document.getElementById('f_sector').value,
+    ticker:document.getElementById('f_ticker').value.trim(),
+    qty,buy,buydate,
+    current:parseFloat(document.getElementById('f_current').value)||null,
+    target:parseFloat(document.getElementById('f_target').value)||null,
+    stop:parseFloat(document.getElementById('f_stop').value)||null,
+    sell:parseFloat(document.getElementById('f_sell').value)||null,
+    selldate:document.getElementById('f_selldate').value||null,
+    reason:document.getElementById('f_reason').value.trim(),
+    news:document.getElementById('f_news').value.trim(),
+    review:document.getElementById('f_review').value.trim(),
+    sentiment:selectedSentiment,
+    priceUpdated:editIdx!=null?stocks[editIdx].priceUpdated:null
+  };
+  if(editIdx!=null)stocks[editIdx]=stock;else stocks.push(stock);
+  save();closeModal();render();
+}
+
+function deleteStock(idx){if(confirm('삭제하시겠습니까?')){stocks.splice(idx,1);save();render();}}
+
+function exportCSV(){
+  const headers=['종목명','업종','티커','주수','매수단가','총투자금','매수일','전날종가','목표가','손절가','매도단가','매도일','매수이유','참고뉴스','심리','반성메모','손익','수익률(%)'];
+  const rows=stocks.map(s=>{const{gain,pct}=calcProfit(s);return[s.name,s.sector,s.ticker||'',s.qty,s.buy,s.buy*s.qty,s.buydate,s.current||'',s.target||'',s.stop||'',s.sell||'',s.selldate||'',`"${(s.reason||'').replace(/"/g,'""')}"`,`"${(s.news||'').replace(/"/g,'""')}"`,s.sentiment||'',`"${(s.review||'').replace(/"/g,'""')}"`,gain!=null?Math.round(gain):'',pct!=null?pct.toFixed(2):''].join(',');});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+[headers.join(','),...rows].join('\n')],{type:'text/csv;charset=utf-8;'}));
+  a.download='주식트래커_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
+
 function render(){renderSummary();renderAlerts();renderRisk();renderPie();renderList();}
 </script>
 </body>
